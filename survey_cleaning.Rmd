@@ -1,0 +1,50 @@
+---
+title: "MY498_Cleaning"
+author: "William Scheffler"
+date: "2024-06-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r read datafile}
+# Read in CSV
+capstone <- read.csv("LSE_Capstone_Survey.csv")
+```
+
+Code below filters the responses to include only the ones who did the audio portion of the survey
+
+```{r filter responses}
+# List of Response IDs
+response_ids <- c("R_2EAxRZAuPGUysXy", "R_2XbscOaOsp2AP8v", "R_2C3fzt70ZhDoMMg", "R_2cqKTCIN7unPWmv",
+                  "R_2urdriuDFPlKS0v", "R_81c1Gk3QkAhuxS8", "R_1MFtNTIVIbjj8aZ", "R_80VfDjcrntZt9uC",
+                  "R_8dyh12LMpKU2Wtn", "R_24bEBOei8N1ueTx", "R_8YzG1wvGFlaXzzj", "R_85XuY0sebuM4gTg",
+                  "R_88EH3pMRZFIV7jP", "R_2RjAYANc520Z5R4", "R_28psL76a0w7H55v", "R_8EstTidYIgiL8G1",
+                  "R_2yqrvcv7JUgf0LX", "R_2U6mnBI2vizkOKi", "R_8rfuZE6RzG24c3Q", "R_2ohd2rehCnb3Jd0",
+                  "R_2ODLzKZfkaOfAcy", "R_8RX2CnEPVSkUohw", "R_2JSyqz1XOe4y2gF", "R_2to3uJFogNZiPl4",
+                  "R_8tL7xIkcMAJTHck", "R_8erDMWROeQkch1I", "R_2HbgSqmozQOBdfS", "R_2Q6NS7x9cwFIFqE",
+                  "R_3NaZj7VtXQPQiWR", "R_2hoLCXP6B84ywOn", "R_4EFdTQO2lB57FQD", "R_2PZAZ2f7yn6bqJ8",
+                  "R_8Q4x5CujdQqnApa", "R_8o1oSFDTR4epb8t", "R_8lltArRPvBS9iTz", "R_4SqUD6pbW2CfZYV",
+                  "R_2E43OtdiKTejzjB", "R_8fdGFg2bsdMUiQP", "R_8YTseCyrrBR90g9", "R_2tzArIzFReer98E",
+                  "R_8MM0HpHXLes0RiL", "R_2ZrXBweqT12VJkd", "R_8gHqu0CMK1jumH3", "R_8XnXK6pwoaGItLr",
+                  "R_2ONa95vIDCBtqT1", "R_2d3QW0DbXp13GFH", "R_2OWgaHYnMtUwV3k", "R_2lMKyPVvr2qmUG6",
+                  "R_2kvIJifkTp7DO3A", "R_8SAednMNAp6Lw9Z", "R_8hyIdzAfGx3FfdP", "R_8dYgPRvYJSidqe6")
+
+# Keep responses where response id matches list
+capstone <- capstone[capstone$ResponseId %in% response_ids,]
+```
+
+```{r treatment group}
+legacygroup <- c("R_2EAxRZAuPGUysXy", "R_2C3fzt70ZhDoMMg", "R_2urdriuDFPlKS0v", "R_1MFtNTIVIbjj8aZ",
+                 "R_8dyh12LMpKU2Wtn", "R_24bEBOei8N1ueTx", "R_8YzG1wvGFlaXzzj", "R_85XuY0sebuM4gTg",
+                 "R_2RjAYANc520Z5R4", "R_8EstTidYIgiL8G1", "R_2ohd2rehCnb3Jd0", "R_8RX2CnEPVSkUohw",
+                 "R_2to3uJFogNZiPl4", "R_8erDMWROeQkch1I", "R_2HbgSqmozQOBdfS", "R_2hoLCXP6B84ywOn",
+                 "R_2PZAZ2f7yn6bqJ8", "R_8o1oSFDTR4epb8t", "R_2E43OtdiKTejzjB", "R_8YTseCyrrBR90g9",
+                 "R_2ZrXBweqT12VJkd", "R_2ONa95vIDCBtqT1", "R_2d3QW0DbXp13GFH", "R_2OWgaHYnMtUwV3k",
+                 "R_2lMKyPVvr2qmUG6", "R_8SAednMNAp6Lw9Z")
+
+# If else statement to create treatment group (legacy or born digital)
+capstone$TreatmentGroup <- ifelse(capstone$ResponseId %in% legacygroup, "Legacy", "Born Digital")
+```

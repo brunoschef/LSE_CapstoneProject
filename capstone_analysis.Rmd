@@ -1,0 +1,960 @@
+---
+title: "MY498_Analysis"
+author: "William Scheffler"
+date: '2023-12-01'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load package}
+library(communication)
+```
+
+```{r create train and validation sets}
+# Get high-arousal negative emotion audio clip files
+wav.fnames.han <- list.files(file.path("/Users/willscheffler/Desktop/CREMA-D/CREMA-D_HAN"),
+                             pattern = 'wav$',
+                             recursive = T,
+                             full.names = T)
+
+# Get low-arousal negative emotion audio clip files
+wav.fnames.lan <- list.files(file.path("/Users/willscheffler/Desktop/CREMA-D/CREMA-D_LAN"),
+                             pattern = 'wav$',
+                             recursive = T,
+                             full.names = T)
+
+# Get positive and neutral emotion audio clip files
+wav.fnames.pos.neu <- list.files(file.path("/Users/willscheffler/Desktop/CREMA-D/CREMA-D_POS_NEU"),
+                             pattern = 'wav$',
+                             recursive = T,
+                             full.names = T)
+
+# Combine all file names
+wav.fnames.all <- c(wav.fnames.han, wav.fnames.lan, wav.fnames.pos.neu)
+
+# Get random files for each category for training data
+set.seed(53)
+wav.fnames.han.train <- sample(wav.fnames.han, 450)
+wav.fnames.lan.train <- sample(wav.fnames.lan, 450)
+wav.fnames.pos.neu.train <- sample(wav.fnames.pos.neu, 450)
+
+# Set difference to get test data options
+wav.fnames.all <- setdiff(wav.fnames.all, c(wav.fnames.han.train, wav.fnames.lan.train, wav.fnames.pos.neu.train))
+
+# Get 5 sets of random names from wav.fnames.all with no overlap between folds
+set.seed(23)
+wav.fnames.test1 <- sample(wav.fnames.all, 200)
+wav.fnames.all <- setdiff(wav.fnames.all, wav.fnames.test1)
+
+set.seed(24)
+wav.fnames.test2 <- sample(wav.fnames.all, 200)
+wav.fnames.all <- setdiff(wav.fnames.all, wav.fnames.test2)
+
+set.seed(25)
+wav.fnames.test3 <- sample(wav.fnames.all, 200)
+wav.fnames.all <- setdiff(wav.fnames.all, wav.fnames.test3)
+
+set.seed(26)
+wav.fnames.test4 <- sample(wav.fnames.all, 200)
+wav.fnames.all <- setdiff(wav.fnames.all, wav.fnames.test4)
+
+set.seed(27)
+wav.fnames.test5 <- sample(wav.fnames.all, 200)
+wav.fnames.all <- setdiff(wav.fnames.all, wav.fnames.test5)
+```
+
+```{r extract audio features}
+# Extract audio features for each emotion category
+han_audio <- extractAudioFeatures(wav.fnames = wav.fnames.han.train,
+                                 wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+lan_audio <- extractAudioFeatures(wav.fnames = wav.fnames.lan.train,
+                                 wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+pos_neu_audio <- extractAudioFeatures(wav.fnames = wav.fnames.pos.neu.train,
+                                     wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                     windowSize = 25,
+                                     windowShift = 12.5,
+                                     windowType = "HAMMING",
+                                     derivatives = 2,
+                                     recursive = TRUE)
+
+test_fold_1 <- extractAudioFeatures(wav.fnames = wav.fnames.test1,
+                                 wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+test_fold_2 <- extractAudioFeatures(wav.fnames = wav.fnames.test2,
+                                 wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+test_fold_3 <- extractAudioFeatures(wav.fnames = wav.fnames.test3,
+                                 wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+test_fold_4 <- extractAudioFeatures(wav.fnames = wav.fnames.test4,
+                                 wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+test_fold_5 <- extractAudioFeatures(wav.fnames = wav.fnames.test5,
+                                 wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+# Rename columns under data to add "X_" to the start of each column name
+names(test_fold_1$data) <- gsub("^\\d+", "X", names(test_fold_1$data))
+names(test_fold_2$data) <- gsub("^\\d+", "X", names(test_fold_2$data))
+names(test_fold_3$data) <- gsub("^\\d+", "X", names(test_fold_3$data))
+names(test_fold_4$data) <- gsub("^\\d+", "X", names(test_fold_4$data))
+names(test_fold_5$data) <- gsub("^\\d+", "X", names(test_fold_5$data))
+
+# Add an item to the test audio folds with true emotion
+for (i in seq_along(test_fold_1$data)) {
+  if (grepl("ANG", names(test_fold_1$data)[i]) | grepl("FEA", names(test_fold_1$data)[i])) {
+    test_fold_1$true_emotion[[i]] <- "HAN"
+  } else if (grepl("DIS", names(test_fold_1$data)[i]) | grepl("SAD", names(test_fold_1$data)[i])) {
+    test_fold_1$true_emotion[[i]] <- "LAN"
+  } else if (grepl("NEU", names(test_fold_1$data)[i]) | grepl("HAP", names(test_fold_1$data)[i])) {
+    test_fold_1$true_emotion[[i]] <- "NEU/POS"
+  } else {
+    test_fold_1$true_emotion[[i]] <- "Unknown"
+  }
+}
+
+for (i in seq_along(test_fold_2$data)) {
+  if (grepl("ANG", names(test_fold_2$data)[i]) | grepl("FEA", names(test_fold_2$data)[i])) {
+    test_fold_2$true_emotion[[i]] <- "HAN"
+  } else if (grepl("DIS", names(test_fold_2$data)[i]) | grepl("SAD", names(test_fold_2$data)[i])) {
+    test_fold_2$true_emotion[[i]] <- "LAN"
+  } else if (grepl("NEU", names(test_fold_2$data)[i]) | grepl("HAP", names(test_fold_2$data)[i])) {
+    test_fold_2$true_emotion[[i]] <- "NEU/POS"
+  } else {
+    test_fold_2$true_emotion[[i]] <- "Unknown"
+  }
+}
+
+for (i in seq_along(test_fold_3$data)) {
+  if (grepl("ANG", names(test_fold_3$data)[i]) | grepl("FEA", names(test_fold_3$data)[i])) {
+    test_fold_3$true_emotion[[i]] <- "HAN"
+  } else if (grepl("DIS", names(test_fold_3$data)[i]) | grepl("SAD", names(test_fold_3$data)[i])) {
+    test_fold_3$true_emotion[[i]] <- "LAN"
+  } else if (grepl("NEU", names(test_fold_3$data)[i]) | grepl("HAP", names(test_fold_3$data)[i])) {
+    test_fold_3$true_emotion[[i]] <- "NEU/POS"
+  } else {
+    test_fold_3$true_emotion[[i]] <- "Unknown"
+  }
+}
+
+for (i in seq_along(test_fold_4$data)) {
+  if (grepl("ANG", names(test_fold_4$data)[i]) | grepl("FEA", names(test_fold_4$data)[i])) {
+    test_fold_4$true_emotion[[i]] <- "HAN"
+  } else if (grepl("DIS", names(test_fold_4$data)[i]) | grepl("SAD", names(test_fold_4$data)[i])) {
+    test_fold_4$true_emotion[[i]] <- "LAN"
+  } else if (grepl("NEU", names(test_fold_4$data)[i]) | grepl("HAP", names(test_fold_4$data)[i])) {
+    test_fold_4$true_emotion[[i]] <- "NEU/POS"
+  } else {
+    test_fold_4$true_emotion[[i]] <- "Unknown"
+  }
+}
+
+for (i in seq_along(test_fold_5$data)) {
+  if (grepl("ANG", names(test_fold_5$data)[i]) | grepl("FEA", names(test_fold_5$data)[i])) {
+    test_fold_5$true_emotion[[i]] <- "HAN"
+  } else if (grepl("DIS", names(test_fold_5$data)[i]) | grepl("SAD", names(test_fold_5$data)[i])) {
+    test_fold_5$true_emotion[[i]] <- "LAN"
+  } else if (grepl("NEU", names(test_fold_5$data)[i]) | grepl("HAP", names(test_fold_5$data)[i])) {
+    test_fold_5$true_emotion[[i]] <- "NEU/POS"
+  } else {
+    test_fold_5$true_emotion[[i]] <- "Unknown"
+  }
+}
+
+test_folds <- list(test_fold_1, test_fold_2, test_fold_3, test_fold_4, test_fold_5)
+```
+
+```{r helper functions}
+# Function to standardize test audio to each model then calculate log-likelihoods
+standardize_and_llh <- function(test_audio, han_hmm, lan_hmm, pos_neu_hmm) {
+  
+  # Standardize and calculate log-likelihoods for HAN model
+  standardized_han <- standardizeFeatures(test_audio$data, feature_means = han_hmm$scaling$feature_means,
+                                          feature_sds = han_hmm$scaling$feature_sds)
+  store_llh_han <- sapply(standardized_han, function(x) calculate_llh(x, han_hmm))
+  
+  # Standardize and calculate log-likelihoods for LAN model
+  standardized_lan <- standardizeFeatures(test_audio$data, feature_means = lan_hmm$scaling$feature_means,
+                                          feature_sds = lan_hmm$scaling$feature_sds)
+  store_llh_lan <- sapply(standardized_lan, function(x) calculate_llh(x, lan_hmm))
+  
+  # Standardize and calculate log-likelihoods for POS_NEU model
+  standardized_pos_neu <- standardizeFeatures(test_audio$data, feature_means = pos_neu_hmm$scaling$feature_means,
+                                              feature_sds = pos_neu_hmm$scaling$feature_sds)
+  store_llh_pos_neu <- sapply(standardized_pos_neu, function(x) calculate_llh(x, pos_neu_hmm))
+  
+  return(list(store_llh_han = store_llh_han, store_llh_lan = store_llh_lan,
+              store_llh_pos_neu = store_llh_pos_neu))
+}
+
+
+# Function to calculate the mean and standard deviation of log-likelihoods
+calculate_mean_sd <- function(log_likelihoods) {
+  mean_llh <- mean(log_likelihoods, na.rm = TRUE)
+  sd_llh <- sd(log_likelihoods, na.rm = TRUE)
+  return(list(mean = mean_llh, sd = sd_llh))
+}
+
+# Function to standardize log-likelihoods
+standardize_llh <- function(log_likelihoods, mean_llh, sd_llh) {
+  standardized_llh <- (log_likelihoods - mean_llh) / sd_llh
+  return(standardized_llh)
+}
+
+# Function to calculate log-likelihoods with NA handling
+calculate_llh <- function(data, model) {
+  llh <- tryCatch({
+    llh_update(data, model)
+  }, error = function(e) {
+    NA  # Return NA in case of error
+  })
+  return(llh)
+}
+```
+
+```{r crossval nstates tuning}
+
+# Define the range of states to be evaluated
+nstates_range <- c(10, 15, 20, 25)
+
+# Initialize a vector to store the accuracies for each number of states
+accuracies <- numeric(length(nstates_range))
+
+# Function to perform cross-validation and calculate accuracies
+calculate_accuracies_cv <- function(nstates, han_audio, lan_audio, pos_neu_audio, test_folds) {
+  
+  print(paste("Calculating accuracies for nstates =", nstates))
+  fold_accuracies <- numeric(length(test_folds))
+  
+  # Train HMMs with the current number of states on the training data
+  han_hmm <- hmm(han_audio$data, nstates = nstates, control = list(verbose = TRUE, maxiter = 50))
+  lan_hmm <- hmm(lan_audio$data, nstates = nstates, control = list(verbose = TRUE, maxiter = 50))
+  pos_neu_hmm <- hmm(pos_neu_audio$data, nstates = nstates, control = list(verbose = TRUE, maxiter = 50))
+  
+  class(han_hmm) <- "feelr.hmm"
+  class(lan_hmm) <- "feelr.hmm"
+  class(pos_neu_hmm) <- "feelr.hmm"
+  
+  for (i in seq_along(test_folds)) {
+    test_audio <- test_folds[[i]]
+    
+    result <- standardize_and_llh(test_audio, han_hmm, lan_hmm, pos_neu_hmm)
+    
+    # Access results
+    store_llh_han <- result$store_llh_han
+    store_llh_lan <- result$store_llh_lan
+    store_llh_pos_neu <- result$store_llh_pos_neu
+    
+    # Drop the second row in each matrix
+    store_llh_han <- store_llh_han[1, ]
+    store_llh_lan <- store_llh_lan[1, ]
+    store_llh_pos_neu <- store_llh_pos_neu[1, ]
+    
+    # Unlist
+    store_llh_han <- unlist(store_llh_han)
+    store_llh_lan <- unlist(store_llh_lan)
+    store_llh_pos_neu <- unlist(store_llh_pos_neu)
+    
+    # Calculate mean and standard deviation for each model's log-likelihoods
+    han_stats <- calculate_mean_sd(store_llh_han)
+    lan_stats <- calculate_mean_sd(store_llh_lan)
+    pos_neu_stats <- calculate_mean_sd(store_llh_pos_neu)
+    
+    # Standardize the log-likelihoods
+    standardized_llh_han <- standardize_llh(store_llh_han, han_stats$mean, han_stats$sd)
+    standardized_llh_lan <- standardize_llh(store_llh_lan, lan_stats$mean, lan_stats$sd)
+    standardized_llh_pos_neu <- standardize_llh(store_llh_pos_neu, pos_neu_stats$mean, pos_neu_stats$sd)
+    
+    # Combine standardized log-likelihoods into a data frame
+    standardized_llh_df <- data.frame(
+      HAN = standardized_llh_han,
+      LAN = standardized_llh_lan,
+      NEU_POS = standardized_llh_pos_neu
+    )
+    
+    # Add true emotion as a column in the data
+    standardized_llh_df$true_emotion <- test_audio$true_emotion
+    
+    # Add 0.01 to any NAs or NaNs in the dataframe
+    standardized_llh_df[is.na(standardized_llh_df)] <- 0.01
+    
+    # Predict emotion for each row dependent on highest normalized llh value
+    standardized_llh_df$pred_emotion <- apply(standardized_llh_df[, 1:3], 1, function(x) {
+      if (all(x == 0)) {
+        return("Unknown")
+      } else {
+        return(names(x)[which.max(x)])
+      }
+    })
+    
+    # New column in dataframe for correct or incorrect predictions
+    standardized_llh_df$correct <- ifelse(standardized_llh_df$true_emotion == standardized_llh_df$pred_emotion, 1, 0)
+    
+    # Accuracy
+    fold_accuracies[i] <- sum(standardized_llh_df$correct) / nrow(standardized_llh_df)
+  }
+  
+  return(mean(fold_accuracies))
+}
+
+# Loop over the range of states and calculate accuracies
+for (j in seq_along(nstates_range)) {
+  nstates <- nstates_range[j]
+  accuracies[j] <- calculate_accuracies_cv(nstates, han_audio, lan_audio, pos_neu_audio, test_folds)
+}
+
+# Find the optimal number of states
+optimal_nstates <- nstates_range[which.max(accuracies)]
+print(paste("Optimal number of states:", optimal_nstates))
+print(paste("Highest accuracy:", max(accuracies)))
+
+```
+
+```{r crossval lambda tuning}
+# Define the range of lambda values
+lambda_range <- seq(0, 1, 0.2)
+
+# Initialize a vector to store the accuracies for each lambda value
+lambda_accuracies <- numeric(length(lambda_range))
+
+# Function to perform cross-validation and calculate accuracies
+calculate_lambda_accuracies_cv <- function(lambda_val, han_audio, lan_audio, pos_neu_audio, test_folds) {
+  
+  print(paste("Calculating accuracies for lambda =", lambda_val))
+  fold_accuracies <- numeric(length(test_folds))
+  
+  # Train HMMs with the current lambda value on the training data
+  han_hmm <- hmm(han_audio$data, nstates = 15,
+                 control = list(verbose = TRUE, maxiter = 50, lambda = lambda_val))
+  lan_hmm <- hmm(lan_audio$data, nstates = 15,
+                 control = list(verbose = TRUE, maxiter = 50, lambda = lambda_val))
+  pos_neu_hmm <- hmm(pos_neu_audio$data, nstates = 15,
+                     control = list(verbose = TRUE, maxiter = 50, lambda = lambda_val))
+  
+  class(han_hmm) <- "feelr.hmm"
+  class(lan_hmm) <- "feelr.hmm"
+  class(pos_neu_hmm) <- "feelr.hmm"
+  
+  for (i in seq_along(test_folds)) {
+    test_audio <- test_folds[[i]]
+    
+    result <- standardize_and_llh(test_audio, han_hmm, lan_hmm, pos_neu_hmm)
+    
+    # Access results
+    store_llh_han <- result$store_llh_han
+    store_llh_lan <- result$store_llh_lan
+    store_llh_pos_neu <- result$store_llh_pos_neu
+    
+    # Drop the second row in each matrix
+    store_llh_han <- store_llh_han[1, ]
+    store_llh_lan <- store_llh_lan[1, ]
+    store_llh_pos_neu <- store_llh_pos_neu[1, ]
+    
+    # Unlist
+    store_llh_han <- unlist(store_llh_han)
+    store_llh_lan <- unlist(store_llh_lan)
+    store_llh_pos_neu <- unlist(store_llh_pos_neu)
+    
+    # Calculate mean and standard deviation for each model's log-likelihoods
+    han_stats <- calculate_mean_sd(store_llh_han)
+    lan_stats <- calculate_mean_sd(store_llh_lan)
+    pos_neu_stats <- calculate_mean_sd(store_llh_pos_neu)
+    
+    # Standardize the log-likelihoods
+    standardized_llh_han <- standardize_llh(store_llh_han, han_stats$mean, han_stats$sd)
+    standardized_llh_lan <- standardize_llh(store_llh_lan, lan_stats$mean, lan_stats$sd)
+    standardized_llh_pos_neu <- standardize_llh(store_llh_pos_neu, pos_neu_stats$mean, pos_neu_stats$sd)
+    
+    # Combine standardized log-likelihoods into a data frame
+    standardized_llh_df <- data.frame(
+      HAN = standardized_llh_han,
+      LAN = standardized_llh_lan,
+      NEU_POS = standardized_llh_pos_neu
+    )
+    
+    # Add true emotion as a column in the data
+    standardized_llh_df$true_emotion <- test_audio$true_emotion
+    
+    # Add 0.01 to any NAs or NaNs in the dataframe
+    standardized_llh_df[is.na(standardized_llh_df)] <- 0.01
+    
+    # Predict emotion for each row dependent on highest normalized llh value
+    standardized_llh_df$pred_emotion <- apply(standardized_llh_df[, 1:3], 1, function(x) {
+      if (all(x == 0)) {
+        return("Unknown")
+      } else {
+        return(names(x)[which.max(x)])
+      }
+    })
+    
+    # New column in dataframe for correct or incorrect predictions
+    standardized_llh_df$correct <- ifelse(standardized_llh_df$true_emotion == standardized_llh_df$pred_emotion, 1, 0)
+    
+    # Accuracy
+    fold_accuracies[i] <- sum(standardized_llh_df$correct) / nrow(standardized_llh_df)
+  }
+  
+  return(mean(fold_accuracies))
+}
+
+# Loop over the range of lambda values and calculate accuracies
+for (j in seq_along(lambda_range)) {
+  lambda_val <- lambda_range[j]
+  lambda_accuracies[j] <- calculate_lambda_accuracies_cv(lambda_val, han_audio, lan_audio, pos_neu_audio, test_folds)
+}
+
+# Find the optimal lambda value
+optimal_lambda <- lambda_range[which.max(lambda_accuracies)]
+print(paste("Optimal lambda value:", optimal_lambda))
+print(paste("Highest accuracy:", max(lambda_accuracies)))
+
+# Note that including the lambda hyperparameter seems to decrease accuracy substantially, so it will not be included in the training of the final model.
+```
+
+```{r train final tuned HMM}
+
+total_test_audio <- c(wav.fnames.test1, wav.fnames.test2, wav.fnames.test3, wav.fnames.test4, wav.fnames.test5)
+
+finalmod_test_audio <- extractAudioFeatures(wav.fnames = total_test_audio,
+                                 wav.dir = "/Users/willscheffler/Desktop/CREMA-D",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+# Train HMMs and get models
+train_hmms <- function() {
+  test_han_hmm <- hmm(han_audio$data,
+                      nstates = 15,
+                      control = list(verbose = TRUE,
+                                     maxiter = 50))
+  
+  test_lan_hmm <- hmm(lan_audio$data,
+                      nstates = 15,
+                      control = list(verbose = TRUE,
+                                     maxiter = 50))
+  
+  test_pos_neu_hmm <- hmm(pos_neu_audio$data,
+                          nstates = 15,
+                          control = list(verbose = TRUE,
+                                         maxiter = 50))
+  
+  return(list(test_han_hmm = test_han_hmm,
+              test_lan_hmm = test_lan_hmm,
+              test_pos_neu_hmm = test_pos_neu_hmm))
+}
+
+# Get models
+models <- train_hmms()
+
+test_han_hmm <- models$test_han_hmm
+test_lan_hmm <- models$test_lan_hmm
+test_pos_neu_hmm <- models$test_pos_neu_hmm
+
+# Class assignment
+class(test_han_hmm) <- "feelr.hmm"
+class(test_lan_hmm) <- "feelr.hmm"
+class(test_pos_neu_hmm) <- "feelr.hmm"
+
+#Add "X_" prefix to column names
+names(finalmod_test_audio$data) <- paste0("X_", names(finalmod_test_audio$data))
+
+#Assign true emotion based on filename patterns
+finalmod_test_audio$true_emotion <- sapply(names(finalmod_test_audio$data), function(x) {
+  if (grepl("ANG|FEA", x)) {
+    "HAN"
+  } else if (grepl("DIS|SAD", x)) {
+    "LAN"
+  } else if (grepl("NEU|HAP", x)) {
+    "NEU_POS"
+  } else {
+    "Unknown"
+  }
+})
+
+# Function to calculate log-likelihoods with NA handling
+calculate_llh <- function(data, model) {
+  llh <- tryCatch({
+    llh_update(data, model)
+  }, error = function(e) {
+    NA  # Return NA in case of error
+  })
+  return(llh)
+}
+
+result <- standardize_and_llh(finalmod_test_audio, test_han_hmm, test_lan_hmm, test_pos_neu_hmm)
+
+# Access results
+store_llh_han <- result$store_llh_han
+store_llh_lan <- result$store_llh_lan
+store_llh_pos_neu <- result$store_llh_pos_neu
+
+# Drop the second row in each matrix
+store_llh_han <- store_llh_han[1, ]
+store_llh_lan <- store_llh_lan[1, ]
+store_llh_pos_neu <- store_llh_pos_neu[1, ]
+
+# Unlist
+store_llh_han <- unlist(store_llh_han)
+store_llh_lan <- unlist(store_llh_lan)
+store_llh_pos_neu <- unlist(store_llh_pos_neu)
+
+
+# Function to calculate the mean and standard deviation of log-likelihoods
+calculate_mean_sd <- function(log_likelihoods) {
+  mean_llh <- mean(log_likelihoods, na.rm = TRUE)
+  sd_llh <- sd(log_likelihoods, na.rm = TRUE)
+  return(list(mean = mean_llh, sd = sd_llh))
+}
+
+# Function to standardize log-likelihoods
+standardize_llh <- function(log_likelihoods, mean_llh, sd_llh) {
+  standardized_llh <- (log_likelihoods - mean_llh) / sd_llh
+  return(standardized_llh)
+}
+
+# Calculate mean and standard deviation for each model's log-likelihoods
+han_stats <- calculate_mean_sd(store_llh_han)
+lan_stats <- calculate_mean_sd(store_llh_lan)
+pos_neu_stats <- calculate_mean_sd(store_llh_pos_neu)
+
+# Standardize the log-likelihoods
+standardized_llh_han <- standardize_llh(store_llh_han, han_stats$mean, han_stats$sd)
+standardized_llh_lan <- standardize_llh(store_llh_lan, lan_stats$mean, lan_stats$sd)
+standardized_llh_pos_neu <- standardize_llh(store_llh_pos_neu, pos_neu_stats$mean, pos_neu_stats$sd)
+
+# Combine standardized log-likelihoods into a data frame
+standardized_llh_df <- data.frame(
+  HAN = standardized_llh_han,
+  LAN = standardized_llh_lan,
+  NEU_POS = standardized_llh_pos_neu
+)
+
+# Add true emotion as a column in the data
+standardized_llh_df$true_emotion <- finalmod_test_audio$true_emotion
+
+# Add 0 to any NAs or NaNs in the dataframe
+standardized_llh_df[is.na(standardized_llh_df)] <- 0.01
+
+
+# Predict emotion for each row dependent on highest normalized llh value
+standardized_llh_df$pred_emotion <- apply(standardized_llh_df[, 1:3], 1, function(x) {
+  if (all(x == 0)) {
+    return("Unknown")
+  } else {
+    return(names(x)[which.max(x)])
+  }
+})
+
+# New column in dataframe for correct or incorrect predictions
+standardized_llh_df$correct <- ifelse(standardized_llh_df$true_emotion == standardized_llh_df$pred_emotion, 1, 0)
+
+# Accuracy
+accuracy <- sum(standardized_llh_df$correct) / nrow(standardized_llh_df)
+```
+
+```{r find best scaling vector}
+# Function to classify based on scaled log-likelihoods
+classify_observation <- function(df, scales) {
+  adjusted_llh_han <- df$HAN * scales[1]
+  adjusted_llh_lan <- df$LAN * scales[2]
+  adjusted_llh_pos_neu <- df$NEU_POS * scales[3]
+  
+  llh_adjusted_df <- data.frame(
+    HAN = adjusted_llh_han,
+    LAN = adjusted_llh_lan,
+    NEU_POS = adjusted_llh_pos_neu,
+    true_emotion = df$true_emotion
+  )
+  
+  llh_adjusted_df$pred_emotion <- apply(llh_adjusted_df[, 1:3], 1, function(x) {
+    categories <- c("HAN", "LAN", "NEU_POS")
+    max_index <- which.max(x)
+    return(categories[max_index])
+  })
+  
+  return(llh_adjusted_df)
+}
+
+# Function to calculate accuracy
+calculate_accuracy <- function(df) {
+  correct <- ifelse(df$pred_emotion == df$true_emotion, 1, 0)
+  return(sum(correct) / length(correct))
+}
+
+# Initial scales
+scales <- c(1, 1, 1)  # Initial scales
+adjusted_df <- classify_observation(standardized_llh_df, scales)
+accuracy <- calculate_accuracy(adjusted_df)
+print(accuracy)
+
+# Grid search for best scales
+best_accuracy <- accuracy
+best_scales <- scales
+
+for (scale_han in seq(0, 2, by = 0.05)) {
+  for (scale_lan in seq(0, 2, by = 0.05)) {
+    for (scale_pos_neu in seq(0, 2, by = 0.05)) {
+      scales <- c(scale_han, scale_lan, scale_pos_neu)
+      adjusted_df <- classify_observation(standardized_llh_df, scales)
+      accuracy <- calculate_accuracy(adjusted_df)
+      
+      if (accuracy > best_accuracy) {
+        best_accuracy <- accuracy
+        best_scales <- scales
+      }
+    }
+  }
+}
+
+print(best_scales)
+print(best_accuracy)
+```
+
+```{r survey audio file extraction}
+
+wav.fnames.survey <- list.files(file.path("/Users/willscheffler/Desktop/LSE/MY498/wavfiles/wav_utterances_processed"),
+                                pattern = 'wav$',
+                                recursive = T,
+                                full.names = T)
+
+
+survey_audio <- extractAudioFeatures(wav.fnames = wav.fnames.survey,
+                                 wav.dir = "/Users/willscheffler/Desktop/LSE/MY498/wavfiles/wav_utterances_processed",
+                                 windowSize = 25,
+                                 windowShift = 12.5,
+                                 windowType = "HAMMING",
+                                 derivatives = 2,
+                                 recursive = TRUE)
+
+```
+
+```{r predict emotion on survey data}
+# Standardize audio and calculate llhs for survey data
+result <- standardize_and_llh(survey_audio, test_han_hmm, test_lan_hmm, test_pos_neu_hmm)
+
+# Access results
+survey_llh_han <- result$store_llh_han
+survey_llh_lan <- result$store_llh_lan
+survey_llh_pos_neu <- result$store_llh_pos_neu
+
+# Drop the second row in each matrix
+survey_llh_han <- survey_llh_han[1, ]
+survey_llh_lan <- survey_llh_lan[1, ]
+survey_llh_pos_neu <- survey_llh_pos_neu[1, ]
+
+# Unlist
+survey_llh_han <- unlist(survey_llh_han)
+survey_llh_lan <- unlist(survey_llh_lan)
+survey_llh_pos_neu <- unlist(survey_llh_pos_neu)
+
+# Scale according to the best scales found above
+for (i in seq_along(survey_llh_han)) {
+  survey_llh_han[i] <- survey_llh_han[i] * best_scales[1]
+  survey_llh_lan[i] <- survey_llh_lan[i] * best_scales[2]
+  survey_llh_pos_neu[i] <- survey_llh_pos_neu[i] * best_scales[3]
+}
+
+# Calculate mean and standard deviation for each model's log-likelihoods
+survey_han_stats <- calculate_mean_sd(survey_llh_han)
+survey_lan_stats <- calculate_mean_sd(survey_llh_lan)
+survey_pos_neu_stats <- calculate_mean_sd(survey_llh_pos_neu)
+
+# Standardize the log-likelihoods
+survey_standardized_llh_han <- standardize_llh(survey_llh_han,
+                                               survey_han_stats$mean, survey_han_stats$sd)
+survey_standardized_llh_lan <- standardize_llh(survey_llh_lan,
+                                               survey_lan_stats$mean, survey_lan_stats$sd)
+survey_standardized_llh_pos_neu <- standardize_llh(survey_llh_pos_neu,
+                                                   survey_pos_neu_stats$mean, survey_pos_neu_stats$sd)
+
+# Combine standardized log-likelihoods into a data frame
+standardized_llh_survey_df <- data.frame(
+  HAN = survey_standardized_llh_han,
+  LAN = survey_standardized_llh_lan,
+  NEU_POS = survey_standardized_llh_pos_neu
+)
+
+# Add 0 to any NAs or NaNs in the dataframe
+standardized_llh_survey_df[is.na(standardized_llh_survey_df)] <- 0
+
+
+# Predict emotion for each row dependent on highest normalized llh value
+standardized_llh_survey_df$pred_emotion <- apply(standardized_llh_survey_df[, 1:3], 1, function(x) {
+  if (all(x == 0)) {
+    return("Unknown")
+  } else {
+    return(names(x)[which.max(x)])
+  }
+})
+
+# Drop rows where predicted emotion is unknown
+standardized_llh_survey_df <- standardized_llh_survey_df[standardized_llh_survey_df$pred_emotion != "Unknown", ]
+```
+
+```{r dataset cleaning}
+# Add the participant numbers to the survey predictions
+row_names <- rownames(standardized_llh_survey_df)
+
+# Get name of row before the second underscore
+participant_names <- sapply(strsplit(row_names, "_"), function(x) {
+  return(x[2])
+})
+participant_names <- paste("R_", participant_names, sep = "")
+
+# Add to dataframe
+standardized_llh_survey_df$ResponseId <- participant_names
+
+# Add the survey groups to the predictions
+final_df <- merge(standardized_llh_survey_df, capstone, by = "ResponseId")
+
+# Consolidate text answers into one column with nominal options
+final_df$Q9 <- ifelse(final_df$Q9 == "Other (please specify)", final_df$Q9_10_TEXT, final_df$Q9)
+final_df$Q10 <- ifelse(final_df$Q10 == "Some other party (please specify)", final_df$Q10_10_TEXT, final_df$Q10)
+
+
+# Select rows to keep in the dataframe
+final_df <- final_df[, c("ResponseId", "HAN", "LAN", "NEU_POS", "pred_emotion",
+                         "TreatmentGroup", "Q6...12", "Q5", "Q6...15", "Q7", "Q8", "Q9", "Q10")]
+
+# One hot encode the predicted emotion column
+final_df$pred_emotion <- as.factor(final_df$pred_emotion)
+final_df <- cbind(final_df, model.matrix(~ pred_emotion - 1, data = final_df))
+
+# Write csv to desktop
+write.csv(final_df, "/Users/willscheffler/Desktop/LSE/MY498/final_df.csv", row.names = FALSE)
+```
+
+```{r exploratory analysis}
+# Two-way table for age
+age_twt <- table(final_df$Q6...12, final_df$pred_emotion)
+print(age_twt)
+
+# Two-way table for gender
+gender_twt <- table(final_df$Q5, final_df$pred_emotion)
+print(gender_twt)
+
+# Two-way table for level of education
+education_twt <- table(final_df$Q6...15, final_df$pred_emotion)
+print(education_twt)
+
+# Two-way table for political attention
+attention_twt <- table(final_df$Q8, final_df$pred_emotion)
+print(attention_twt)
+
+# Two-way table for source of political news
+source_twt <- table(final_df$Q9, final_df$pred_emotion)
+print(source_twt)
+
+# Two-way table for political party affiliation
+party_twt <- table(final_df$Q10, final_df$pred_emotion)
+print(party_twt)
+
+# Two-way table for treatment group
+treatment_twt <- table(final_df$TreatmentGroup, final_df$pred_emotion)
+print(treatment_twt)
+```
+
+```{r significance tests for within-demographic difference in proportions}
+# Testing for statistically significant difference in proportions for education
+HAN_undergrad <- 155
+LAN_undergrad <- 119
+HAN_postgrad <- 39
+LAN_postgrad <- 91
+
+# Define the total counts for each group
+total_undergrad <- HAN_undergrad + LAN_undergrad
+total_postgrad <- HAN_postgrad + LAN_postgrad
+
+# Define the proportions
+prop_HAN_undergrad <- HAN_undergrad / total_undergrad
+prop_HAN_postgrad <- HAN_postgrad / total_postgrad
+
+# Two-Proportion Z-Test
+ed_test_result <- prop.test(
+  x = c(HAN_undergrad, HAN_postgrad),  # number of successes (HAN) in each group
+  n = c(total_undergrad, total_postgrad),  # total number of observations in each group
+  correct = FALSE  # use correct = FALSE to avoid Yates' continuity correction
+)
+
+print(ed_test_result)
+
+
+# Testing for statistically significant difference in proportions in gender
+HAN_notclose <- 37
+LAN_notclose <- 92
+HAN_close <- 180
+LAN_close <- 146
+
+# Define the total counts for each group
+total_notclose <- HAN_notclose + LAN_notclose
+total_close <- HAN_close + LAN_close
+
+# Define the proportions
+prop_HAN_notclose <- HAN_notclose / total_notclose
+prop_HAN_close <- HAN_close / total_close
+
+# Two-Proportion Z-Test
+attention_test_result <- prop.test(
+  x = c(HAN_notclose, HAN_close),
+  n = c(total_notclose, total_close),
+  correct = FALSE
+)
+
+print(attention_test_result)
+
+
+# Testing for difference in proportions for Labour supporters and non-Labour supporters
+HAN_labour <- 50
+LAN_labour <- 28
+HAN_nonlabour <- 168
+LAN_nonlabour <- 204
+
+# Define the total counts for each group
+total_labour <- HAN_labour + LAN_labour
+total_nonlabour <- HAN_nonlabour + LAN_nonlabour
+
+# Define the proportions
+prop_HAN_labour <- HAN_labour / total_labour
+prop_HAN_nonlabour <- HAN_nonlabour / total_nonlabour
+
+# Two-Proportion Z-Test
+party_test_result <- prop.test(
+  x = c(HAN_labour, HAN_nonlabour),
+  n = c(total_labour, total_nonlabour),
+  correct = FALSE
+)
+
+print(party_test_result)
+
+
+# Testing for difference in proportions for Lib Dems
+NP_LD <- 31
+Neg_LD <- 84
+NP_nonLD <- 68
+Neg_nonLD <- 366
+
+# Define the total counts for each group
+total_LD <- NP_LD + Neg_LD
+total_nonLD <- NP_nonLD + Neg_nonLD
+
+# Define the proportions
+prop_NP_LD <- NP_LD / total_LD
+prop_NP_nonLD <- NP_nonLD / total_nonLD
+
+# Two-Proportion Z-Test
+ld_test_result <- prop.test(
+  x = c(NP_LD, NP_nonLD),
+  n = c(total_LD, total_nonLD),
+  correct = FALSE
+)
+
+print(ld_test_result)
+
+```
+
+```{r prep for regression}
+# Due to small counts in some categories, some categories were combined into an "Other" category, where it made sense to do so.
+# Find rows with NAs in final_df
+na_rows <- which(rowSums(is.na(final_df)) > 0)
+
+# Impute "I do not feel close to any party for missing values of Q10
+final_df$Q10[na_rows] <- "I do not feel close to any party"
+
+# Remove rows with missing data
+final_df <- final_df[-na_rows, ]
+
+# Combine small categories into "Other" for Q10
+final_df$Q10 <- as.character(final_df$Q10)
+final_df$Q10[final_df$Q10 == "Alliance"] <- "Other"
+final_df$Q10[final_df$Q10 == "Scottish National Party (SNP)"] <- "Other"
+final_df$Q10[final_df$Q10 == "Sinn Fein"] <- "Other"
+final_df$Q10 <- as.factor(final_df$Q10)
+
+# Combine small categories into Other for Q9
+final_df$Q9 <- as.character(final_df$Q9)
+final_df$Q9[final_df$Q9 == "apple news"] <- "Other"
+final_df$Q9[final_df$Q9 == "None/I don't follow the news"] <- "Other"
+final_df$Q9[final_df$Q9 == "Online news websites"] <- "Other"
+final_df$Q9[final_df$Q9 == "through friends , family and word of mouth"] <- "Other"
+final_df$Q9[final_df$Q9 == "Radio"] <- "Other"
+final_df$Q9 <- as.factor(final_df$Q9)
+
+# Relevel the treatment group
+final_df$TreatmentGroup <- as.factor(final_df$TreatmentGroup)
+final_df$TreatmentGroup <- relevel(final_df$TreatmentGroup, ref = "Legacy")
+
+final_df$pred_emotionHAN <- as.factor(final_df$pred_emotionHAN)
+final_df$pred_emotionLAN <- as.factor(final_df$pred_emotionLAN)
+final_df$pred_emotionNEU_POS <- as.factor(final_df$pred_emotionNEU_POS)
+final_df$Q6...12 <- as.factor(final_df$Q6...12)
+final_df$Q6...15 <- as.factor(final_df$Q6...15)
+final_df$Q5 <- as.factor(final_df$Q5)
+final_df$Q8 <- as.factor(final_df$Q8)
+
+```
+
+```{r regression models for treatment}
+# Run binary logistic regression models with controls
+han_logit <- glm(pred_emotionHAN ~ TreatmentGroup + Q6...12 + Q5 + Q6...15 + Q8 + Q9 + Q10,
+                 data = final_df, family = "binomial")
+
+lan_logit <- glm(pred_emotionLAN ~ TreatmentGroup + Q6...12 + Q5 + Q6...15 + Q8 + Q9 + Q10,
+                 data = final_df, family = "binomial")
+
+neu_pos_logit <- glm(pred_emotionNEU_POS ~ TreatmentGroup + Q6...12 + Q5 + Q6...15 + Q8 + Q9 + Q10,
+                     data = final_df, family = "binomial")
+
+summary(han_logit)
+summary(lan_logit)
+summary(neu_pos_logit)
+
+# Run binary logistic regression models without controls
+simple_han_logit <- glm(pred_emotionHAN ~ TreatmentGroup, data = final_df, family = "binomial")
+simple_lan_logit <- glm(pred_emotionLAN ~ TreatmentGroup, data = final_df, family = "binomial")
+simple_neu_pos_logit <- glm(pred_emotionNEU_POS ~ TreatmentGroup, data = final_df, family = "binomial")
+
+summary(simple_han_logit)
+summary(simple_lan_logit)
+summary(simple_neu_pos_logit)
+```
